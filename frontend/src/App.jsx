@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, Routes, Route, NavLink, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, Link } from "react-router-dom";
 
 const API_BASE = import.meta.env.VITE_API_URL || "http://127.0.0.1:8000/api";
 const TOKEN_KEY = "saas_factures_ia_tokens";
@@ -71,6 +71,7 @@ function badgeTone(status) {
 }
 
 function MainApp() {
+  const navigate = useNavigate();
   const [tokens, setTokens] = useState(() => readStoredTokens());
   const [user, setUser] = useState(null);
   const [dashboard, setDashboard] = useState(null);
@@ -78,7 +79,7 @@ function MainApp() {
   const [plans, setPlans] = useState(plansFallback);
   const [selectedId, setSelectedId] = useState(null);
   const [reviewDraft, setReviewDraft] = useState(null);
-  const [authForm, setAuthForm] = useState({ username: "owner", password: "demo12345" });
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
   const [registerForm, setRegisterForm] = useState({ username: "", email: "", password: "", organization_name: "" });
   const [uploadFile, setUploadFile] = useState(null);
   const [uploadStatus, setUploadStatus] = useState("");
@@ -210,6 +211,7 @@ function MainApp() {
     setAuthForm({ username: registerForm.username, password: registerForm.password });
     setRegisterForm({ username: "", email: "", password: "", organization_name: "" });
     setError("Compte créé. Connectez-vous.");
+    navigate("/login");
   }
 
   async function handleUpload(event) {
@@ -386,39 +388,31 @@ function MainApp() {
 
   if (!tokens) {
     return (
-      <div className="auth-shell">
-        <section className="auth-panel intro-panel">
-          <p className="eyebrow">✦ Plateforme SaaS</p>
-          <h1>Factures IA</h1>
-          <p>
-            Automatisez l'extraction, la validation et le suivi de vos factures grâce à l'intelligence artificielle. Pipeline OCR + IA prêt à l'emploi.
-          </p>
-          <div className="demo-box">
-            <strong>🔑 Accès démo</strong>
-            <span>owner</span>
-            <span>demo12345</span>
-          </div>
-        </section>
-
-        <section className="auth-panel">
-          <h2>Connexion</h2>
-          <form onSubmit={handleLogin} className="stack-form">
-            <input id="login-username" value={authForm.username} onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })} placeholder="Nom d'utilisateur" />
-            <input id="login-password" type="password" value={authForm.password} onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} placeholder="Mot de passe" />
-            <button id="login-submit" type="submit">Se connecter →</button>
-          </form>
-
-          <h3 style={{marginTop: '24px'}}>Créer une organisation</h3>
-          <form onSubmit={handleRegister} className="stack-form">
-            <input id="reg-org" value={registerForm.organization_name} onChange={(e) => setRegisterForm({ ...registerForm, organization_name: e.target.value })} placeholder="Nom de l'organisation" />
-            <input id="reg-user" value={registerForm.username} onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })} placeholder="Nom d'utilisateur" />
-            <input id="reg-email" type="email" value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} placeholder="Adresse email" />
-            <input id="reg-pass" type="password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} placeholder="Mot de passe" />
-            <button id="reg-submit" type="submit" className="secondary-button">Créer le compte</button>
-          </form>
-          {error && <p className="error-text">{error}</p>}
-        </section>
-      </div>
+      <Routes>
+        <Route 
+          path="/login" 
+          element={
+            <LoginView 
+              authForm={authForm} 
+              setAuthForm={setAuthForm} 
+              handleLogin={handleLogin} 
+              error={error} 
+            />
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            <RegisterView 
+              registerForm={registerForm} 
+              setRegisterForm={setRegisterForm} 
+              handleRegister={handleRegister} 
+              error={error} 
+            />
+          } 
+        />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
     );
   }
 
@@ -710,4 +704,201 @@ function mapInvoiceToDraft(invoice) {
     invoiceNumber: invoice.invoiceNumber || invoice.invoice_number || "",
     fileName: invoice.fileName || invoice.file_name,
   };
+}
+
+function AuthShellLayout({ children }) {
+  return (
+    <div className="auth-shell">
+      <section className="auth-panel intro-panel">
+        <div className="intro-header">
+          <div className="logo-container">
+            <div className="logo-icon">✦</div>
+            <span style={{ fontSize: '1.25rem', fontWeight: 'bold', fontFamily: 'Space Grotesk' }}>Factures IA</span>
+          </div>
+          <h1>Gerez vos factures intelligemment</h1>
+          <p>
+            Automatisez l'extraction, la validation et le suivi de vos factures grace a l'intelligence artificielle.
+          </p>
+        </div>
+
+        <div className="intro-visual">
+          <div className="mock-app-window">
+            <div className="window-header">
+              <div className="window-dots">
+                <div className="window-dot"></div>
+                <div className="window-dot"></div>
+                <div className="window-dot"></div>
+              </div>
+              <div className="window-title">ocr-pipeline-worker.js</div>
+            </div>
+            <div className="mock-invoice-container">
+              <div className="invoice-card-mock">
+                <div className="scanner-line"></div>
+                <div className="invoice-mock-line header"></div>
+                <div className="invoice-mock-line long"></div>
+                <div className="invoice-mock-line medium"></div>
+                <div className="invoice-mock-line short"></div>
+                <div className="invoice-mock-table">
+                  <div className="invoice-mock-line long"></div>
+                  <div className="invoice-mock-line medium"></div>
+                </div>
+              </div>
+              <div className="extracted-nodes-mock">
+                <div className="data-node-mock">
+                  <div className="data-node-label">Fournisseur <span className="conf">99%</span></div>
+                  <div className="data-node-val">TotalEnergies</div>
+                </div>
+                <div className="data-node-mock">
+                  <div className="data-node-label">Montant TTC <span className="conf">98%</span></div>
+                  <div className="data-node-val">142,50 EUR</div>
+                </div>
+                <div className="data-node-mock">
+                  <div className="data-node-label">TVA <span className="conf">97%</span></div>
+                  <div className="data-node-val">23,75 EUR</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="intro-footer">
+          <div className="security-dot"></div>
+          <span>Chiffrement AES-256 et IA souveraine</span>
+        </div>
+      </section>
+
+      <section className="auth-panel auth-form-container">
+        {children}
+      </section>
+    </div>
+  );
+}
+
+function LoginView({ authForm, setAuthForm, handleLogin, error }) {
+  return (
+    <AuthShellLayout>
+      <div className="auth-card">
+        <div className="auth-card-header">
+          <h2>Bon retour !</h2>
+          <p>Connectez-vous a votre espace Factures IA</p>
+        </div>
+
+        <form onSubmit={handleLogin} className="stack-form">
+          <div className="form-group">
+            <label htmlFor="login-username">Nom d'utilisateur</label>
+            <input 
+              id="login-username" 
+              required
+              value={authForm.username} 
+              onChange={(e) => setAuthForm({ ...authForm, username: e.target.value })} 
+              placeholder="Ex: owner" 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="login-password">Mot de passe</label>
+            <input 
+              id="login-password" 
+              type="password" 
+              required
+              value={authForm.password} 
+              onChange={(e) => setAuthForm({ ...authForm, password: e.target.value })} 
+              placeholder="••••••••" 
+            />
+          </div>
+
+          <button id="login-submit" type="submit">
+            Se connecter →
+          </button>
+        </form>
+
+        {error && (
+          <p className={error.includes("créé") ? "success-text" : "error-text"} style={{ marginTop: '16px', textAlign: 'center' }}>
+            {error}
+          </p>
+        )}
+
+        <div className="auth-toggle-footer">
+          Nouveau sur la plateforme ? 
+          <Link to="/register">Creer une organisation</Link>
+        </div>
+      </div>
+    </AuthShellLayout>
+  );
+}
+
+function RegisterView({ registerForm, setRegisterForm, handleRegister, error }) {
+  return (
+    <AuthShellLayout>
+      <div className="auth-card">
+        <div className="auth-card-header">
+          <h2>Creer un compte</h2>
+          <p>Rejoignez Factures IA aujourd'hui</p>
+        </div>
+
+        <form onSubmit={handleRegister} className="stack-form">
+          <div className="form-group">
+            <label htmlFor="reg-org">Nom de l'organisation</label>
+            <input 
+              id="reg-org" 
+              required
+              value={registerForm.organization_name} 
+              onChange={(e) => setRegisterForm({ ...registerForm, organization_name: e.target.value })} 
+              placeholder="Ex: ACME Corp" 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="reg-user">Nom d'utilisateur</label>
+            <input 
+              id="reg-user" 
+              required
+              value={registerForm.username} 
+              onChange={(e) => setRegisterForm({ ...registerForm, username: e.target.value })} 
+              placeholder="Ex: alex" 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="reg-email">Adresse email</label>
+            <input 
+              id="reg-email" 
+              type="email" 
+              required
+              value={registerForm.email} 
+              onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} 
+              placeholder="alex@example.com" 
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="reg-pass">Mot de passe</label>
+            <input 
+              id="reg-pass" 
+              type="password" 
+              required
+              value={registerForm.password} 
+              onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} 
+              placeholder="••••••••" 
+            />
+          </div>
+
+          <button id="reg-submit" type="submit">
+            Creer le compte →
+          </button>
+        </form>
+
+        {error && (
+          <p className={error.includes("créé") ? "success-text" : "error-text"} style={{ marginTop: '16px', textAlign: 'center' }}>
+            {error}
+          </p>
+        )}
+
+        <div className="auth-toggle-footer">
+          Deja un compte ? 
+          <Link to="/login">Se connecter</Link>
+        </div>
+      </div>
+    </AuthShellLayout>
+  );
 }

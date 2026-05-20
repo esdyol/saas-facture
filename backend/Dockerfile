@@ -9,4 +9,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 ENV TESSERACT_CMD=/usr/bin/tesseract
 ENV TESSERACT_LANG=fra+eng
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
+CMD ["sh", "-c", "python manage.py migrate && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
+

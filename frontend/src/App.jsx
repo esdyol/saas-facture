@@ -450,36 +450,114 @@ function MainApp() {
         <Routes>
           <Route path="/" element={
             <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
-              <section className="hero-grid" style={{gridTemplateColumns: '1fr'}}>
-                <article className="panel hero-panel">
-            <p className="eyebrow">📊 Dashboard</p>
-            <h2>Vue d'ensemble</h2>
-            <div className="stats-grid">
-              <StatCard label="Total factures" value={dashboard?.kpis?.invoiceCount ?? 0} />
-              <StatCard label="Validées" value={dashboard?.kpis?.validatedCount ?? 0} />
-              <StatCard label="En traitement" value={dashboard?.kpis?.processingCount ?? 0} />
-              <StatCard label="Dépenses totales" value={formatMoney(dashboard?.kpis?.totalSpend ?? 0)} />
-            </div>
-          </article>
-
-          <article className="panel chart-panel">
-            <p className="eyebrow">📈 Dépenses mensuelles</p>
-            <h3>Tendance</h3>
-            <div className="bars">
-              {(dashboard?.monthlySpend || []).map((item) => (
-                <div key={item.month} className="bar-column">
-                  <div className="bar-track">
-                    <div className="bar-fill" style={{ height: `${Math.min(Math.max((item.total / 600) * 100, 8), 100)}%` }} />
-                  </div>
-                  <strong>{item.month}</strong>
-                  <span>{formatMoney(item.total)}</span>
+              <div className="dashboard-header">
+                <div className="dashboard-header-text">
+                  <h2>Vue d'ensemble</h2>
+                  <p>Suivez l'extraction de vos factures et vos dépenses en temps réel.</p>
                 </div>
-              ))}
+                <button 
+                  type="button" 
+                  className="btn-primary" 
+                  onClick={() => navigate("/invoices")}
+                >
+                  📤 Importer une facture
+                </button>
+              </div>
+
+              <div className="dashboard-layout-grid">
+                <div className="dashboard-main-col">
+                  {/* KPI Cards */}
+                  <article className="panel hero-panel" style={{ paddingBottom: '20px' }}>
+                    <p className="eyebrow" style={{ color: 'var(--brand-light)' }}>📊 Indicateurs clés</p>
+                    <div className="stats-grid" style={{ marginTop: '12px' }}>
+                      <StatCard 
+                        label="Total factures" 
+                        value={dashboard?.kpis?.invoiceCount ?? invoices.length} 
+                        icon="📄" 
+                        trendText="Tous documents"
+                        trendType="neutral"
+                      />
+                      <StatCard 
+                        label="Validées" 
+                        value={dashboard?.kpis?.validatedCount ?? invoices.filter(i => i.status === 'done').length} 
+                        icon="✓" 
+                        trendText="Prêt compta"
+                        trendType="positive"
+                      />
+                      <StatCard 
+                        label="En traitement" 
+                        value={dashboard?.kpis?.processingCount ?? invoices.filter(i => ['uploaded', 'processing'].includes(i.status)).length} 
+                        icon="⚙️" 
+                        trendText="IA en cours"
+                        trendType="neutral"
+                      />
+                      <StatCard 
+                        label="Dépenses totales" 
+                        value={formatMoney(dashboard?.kpis?.totalSpend ?? invoices.filter(i => i.status === 'done').reduce((acc, i) => acc + (i.amountTtc || 0), 0))} 
+                        icon="💶" 
+                        trendText="TTC Validé"
+                        trendType="positive"
+                      />
+                    </div>
+                  </article>
+
+                  {/* Monthly Trend Area Chart */}
+                  <article className="panel chart-panel-premium">
+                    <div className="panel-title-row">
+                      <div>
+                        <p className="eyebrow" style={{ color: 'var(--brand-light)' }}>📈 Analyse financière</p>
+                        <h3>Tendance des dépenses</h3>
+                      </div>
+                      <div className="chart-legend">
+                        <div className="legend-item">
+                          <span className="legend-color-dot" />
+                          <span>Dépenses mensuelles (EUR)</span>
+                        </div>
+                      </div>
+                    </div>
+                    <CustomAreaChart data={dashboard?.monthlySpend || []} />
+                  </article>
+
+                  {/* Recent Invoices Table */}
+                  <article className="panel recent-invoices-card">
+                    <div className="recent-invoices-header">
+                      <div>
+                        <p className="eyebrow" style={{ color: 'var(--brand-light)' }}>📁 Activité récente</p>
+                        <h3>Derniers documents traités</h3>
+                      </div>
+                      <Link to="/invoices" style={{ fontSize: '0.82rem', fontWeight: 600 }}>Voir tout →</Link>
+                    </div>
+                    <RecentInvoicesTable 
+                      invoices={dashboard?.latestInvoices ?? invoices.slice(0, 5)} 
+                      onReview={(id) => {
+                        setSelectedId(id);
+                        navigate("/invoices");
+                      }}
+                    />
+                  </article>
+                </div>
+
+                <div className="dashboard-side-col">
+                  {/* Quota Gauge */}
+                  <article className="panel">
+                    <p className="eyebrow" style={{ color: 'var(--teal)' }}>⚡ Quota de l'organisation</p>
+                    <h3>Consommation mensuelle</h3>
+                    <QuotaRadialCircle 
+                      used={dashboard?.organization?.quotaUsed ?? user?.organization?.quotaUsed ?? invoices.length}
+                      total={dashboard?.organization?.monthlyQuota ?? user?.organization?.monthlyQuota ?? 20}
+                    />
+                  </article>
+
+                  {/* Category Spend Progress Bar */}
+                  <article className="panel">
+                    <p className="eyebrow" style={{ color: 'var(--teal)' }}>🏷️ Répartition analytique</p>
+                    <h3>Dépenses par catégorie</h3>
+                    <CategoryBars categories={dashboard?.categorySpend || []} />
+                  </article>
+                </div>
+              </div>
             </div>
-          </article>
-        </section>
-      </div>
-    } />
+          } />
 
     <Route path="/invoices" element={
       <div style={{display: 'flex', flexDirection: 'column', gap: '24px'}}>
@@ -683,11 +761,318 @@ export default function App() {
   );
 }
 
-function StatCard({ label, value }) {
+function StatCard({ label, value, icon, trendText, trendType = "positive" }) {
   return (
     <div className="stat-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
+      <div className="stat-card-header">
+        <span>{label}</span>
+        {icon && <span className="stat-card-icon">{icon}</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '8px' }}>
+        <strong>{value}</strong>
+        {trendText && (
+          <span className={`kpi-trend ${trendType}`}>
+            {trendText}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CustomAreaChart({ data }) {
+  const [activePoint, setActivePoint] = useState(null);
+
+  if (!data || data.length === 0) {
+    return (
+      <div className="svg-chart-wrapper" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="svg-no-data">Aucune donnée disponible pour le graphique.</div>
+      </div>
+    );
+  }
+
+  // Margin and dimensions
+  const margin = { top: 20, right: 20, bottom: 30, left: 55 };
+  const containerWidth = 500;
+  const containerHeight = 200;
+  
+  const chartWidth = containerWidth - margin.left - margin.right;
+  const chartHeight = containerHeight - margin.top - margin.bottom;
+
+  // Max value calculation
+  const maxVal = Math.max(...data.map((d) => d.total), 100);
+  const maxY = Math.ceil(maxVal * 1.15); // Add padding to top
+
+  // Map data to SVG coordinates
+  const points = data.map((d, index) => {
+    const x = margin.left + (index / (data.length - 1 || 1)) * chartWidth;
+    const y = margin.top + chartHeight - (d.total / maxY) * chartHeight;
+    return { x, y, month: d.month, total: d.total };
+  });
+
+  // SVG Bezier path string
+  const getBezierPath = (pts) => {
+    if (pts.length === 0) return "";
+    if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
+    let d = `M ${pts[0].x} ${pts[0].y}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i];
+      const p1 = pts[i + 1];
+      const cpX1 = p0.x + (p1.x - p0.x) / 3;
+      const cpY1 = p0.y;
+      const cpX2 = p0.x + 2 * (p1.x - p0.x) / 3;
+      const cpY2 = p1.y;
+      d += ` C ${cpX1} ${cpY1}, ${cpX2} ${cpY2}, ${p1.x} ${p1.y}`;
+    }
+    return d;
+  };
+
+  const getAreaPath = (pts) => {
+    if (pts.length === 0) return "";
+    const linePath = getBezierPath(pts);
+    return `${linePath} L ${pts[pts.length - 1].x} ${margin.top + chartHeight} L ${pts[0].x} ${margin.top + chartHeight} Z`;
+  };
+
+  const linePath = getBezierPath(points);
+  const areaPath = getAreaPath(points);
+
+  // Y-axis grid labels (4 ticks)
+  const yTicks = [0, Math.round(maxY / 3), Math.round((2 * maxY) / 3), maxY];
+
+  return (
+    <div className="svg-chart-wrapper">
+      <svg className="svg-chart-container" viewBox={`0 0 ${containerWidth} ${containerHeight}`} width="100%" height="100%">
+        <defs>
+          <linearGradient id="chart-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="var(--brand-light)" stopOpacity="0.4" />
+            <stop offset="100%" stopColor="var(--brand-glow)" stopOpacity="0.0" />
+          </linearGradient>
+        </defs>
+
+        {/* Gridlines */}
+        {yTicks.map((tick, index) => {
+          const yPos = margin.top + chartHeight - (tick / maxY) * chartHeight;
+          return (
+            <g key={index}>
+              <line
+                className="svg-chart-gridline"
+                x1={margin.left}
+                y1={yPos}
+                x2={containerWidth - margin.right}
+                y2={yPos}
+              />
+              <text
+                className="svg-chart-axis-text svg-chart-axis-text-y"
+                x={margin.left - 8}
+                y={yPos + 4}
+              >
+                {formatMoney(tick)}
+              </text>
+            </g>
+          );
+        })}
+
+        {/* X axis line */}
+        <line
+          className="svg-chart-axis-line"
+          x1={margin.left}
+          y1={margin.top + chartHeight}
+          x2={containerWidth - margin.right}
+          y2={margin.top + chartHeight}
+        />
+
+        {/* Filled Area */}
+        {areaPath && <path className="svg-chart-area" d={areaPath} />}
+
+        {/* Smooth Line */}
+        {linePath && <path className="svg-chart-line" d={linePath} />}
+
+        {/* Points & Interactive Hover Circles */}
+        {points.map((pt, index) => (
+          <g key={index}>
+            <circle
+              className="svg-chart-point-outer"
+              cx={pt.x}
+              cy={pt.y}
+              r="5"
+              onMouseEnter={() => setActivePoint(pt)}
+              onMouseLeave={() => setActivePoint(null)}
+            />
+            <circle
+              className="svg-chart-point-inner"
+              cx={pt.x}
+              cy={pt.y}
+              r="2"
+            />
+            {/* X axis labels */}
+            <text
+              className="svg-chart-axis-text"
+              x={pt.x}
+              y={containerHeight - 8}
+            >
+              {pt.month}
+            </text>
+          </g>
+        ))}
+      </svg>
+
+      {/* Interactive Tooltip */}
+      {activePoint && (
+        <div
+          className="chart-tooltip-portal"
+          style={{
+            left: `${(activePoint.x / containerWidth) * 100}%`,
+            top: `${(activePoint.y / containerHeight) * 100}%`,
+            opacity: 1,
+          }}
+        >
+          <span className="chart-tooltip-month">{activePoint.month}</span>
+          <span className="chart-tooltip-value">{formatMoney(activePoint.total)}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuotaRadialCircle({ used = 0, total = 0 }) {
+  const hasLimit = total && total > 0;
+  const percentage = hasLimit ? Math.min(Math.round((used / total) * 100), 100) : 0;
+  
+  // Circumference for r = 40 (cx = 50, cy = 50)
+  const strokeDasharray = 251.2;
+  const strokeDashoffset = hasLimit ? strokeDasharray - (percentage / 100) * strokeDasharray : 0;
+
+  return (
+    <div className="quota-radial-widget">
+      <div className="radial-svg-container">
+        <svg viewBox="0 0 100 100" width="100%" height="100%">
+          <circle
+            className="radial-svg-circle-bg"
+            cx="50"
+            cy="50"
+            r="40"
+          />
+          <circle
+            className="radial-svg-circle-fill"
+            cx="50"
+            cy="50"
+            r="40"
+            strokeDasharray={strokeDasharray}
+            strokeDashoffset={strokeDashoffset}
+          />
+        </svg>
+        <div className="radial-label-container">
+          <span className="radial-label-value">
+            {hasLimit ? `${percentage}%` : "∞"}
+          </span>
+          <span className="radial-label-text">
+            {hasLimit ? "Utilisé" : "Illimité"}
+          </span>
+        </div>
+      </div>
+      <div className="quota-radial-footer">
+        {hasLimit ? (
+          <>
+            <strong>{used}</strong> sur <strong>{total}</strong> factures traitées ce mois-ci
+          </>
+        ) : (
+          <>
+            <strong>{used}</strong> factures traitées ce mois-ci (Plan illimité)
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CategoryBars({ categories = [] }) {
+  const colors = ["#6366f1", "#14b8a6", "#f59e0b", "#f43f5e", "#10b981"];
+  
+  if (!categories || categories.length === 0) {
+    return <p className="helper-text" style={{ fontStyle: 'italic', textAlign: 'center', marginTop: '16px' }}>Aucune donnée de catégorie disponible.</p>;
+  }
+
+  const maxVal = Math.max(...categories.map((c) => c.total), 1) || 1;
+
+  return (
+    <div className="category-spend-list">
+      {categories.map((item, index) => {
+        const color = colors[index % colors.length];
+        const pct = Math.max((item.total / maxVal) * 100, 5); // at least 5% visual fill
+        return (
+          <div key={item.category || index} className="category-item">
+            <div className="category-item-header">
+              <span className="category-name-badge">
+                <span className="category-color-pill" style={{ backgroundColor: color }} />
+                {item.category || "Autre"}
+              </span>
+              <span className="category-amount" style={{ color: color }}>
+                {formatMoney(item.total)}
+              </span>
+            </div>
+            <div className="category-bar-track">
+              <div 
+                className="category-bar-fill" 
+                style={{ 
+                  width: `${pct}%`, 
+                  backgroundColor: color,
+                  color: color
+                }} 
+              />
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RecentInvoicesTable({ invoices = [], onReview }) {
+  if (!invoices || invoices.length === 0) {
+    return <p className="helper-text" style={{ fontStyle: 'italic', textAlign: 'center', marginTop: '16px' }}>Aucune facture récente.</p>;
+  }
+
+  return (
+    <div className="recent-table-wrapper">
+      <table className="recent-table">
+        <thead>
+          <tr>
+            <th>Document</th>
+            <th>Fournisseur</th>
+            <th>Statut</th>
+            <th>Total TTC</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {invoices.map((inv) => (
+            <tr key={inv.id}>
+              <td>
+                <div className="recent-inv-name" title={inv.fileName}>{inv.fileName}</div>
+                <div className="recent-inv-date">{inv.invoiceDate || "Sans date"}</div>
+              </td>
+              <td>
+                <span style={{ fontWeight: 500 }}>{inv.supplier || "À identifier"}</span>
+              </td>
+              <td>
+                <span className={`badge ${badgeTone(inv.status)}`}>{inv.status}</span>
+              </td>
+              <td>
+                <span className="recent-inv-amount">{formatMoney(inv.amountTtc)}</span>
+              </td>
+              <td>
+                <button 
+                  type="button" 
+                  className="recent-inv-action-btn"
+                  onClick={() => onReview(inv.id)}
+                >
+                  🔍 Revoir
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
